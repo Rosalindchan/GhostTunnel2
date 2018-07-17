@@ -1,0 +1,14 @@
+﻿  Action_ExcuteCmd.cpp
+  Action_Sendfile.cpp
+  mainProcess.cpp
+mainProcess.cpp(45): warning C4018: “<”: 有符号/无符号不匹配
+mainProcess.cpp(211): warning C4018: “<”: 有符号/无符号不匹配
+  main.cpp
+  正在生成代码
+e:\wechat files\chenyuan940613\files\v1.3-二合一\v1.3-二合一\被控端\ghosttunnel\mainprocess.cpp(222): warning C4715: “mainProcess::getssid”: 不是所有的控件路径都返回值
+  168 of 170 functions (98.8%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  已完成代码的生成
+  ghostTunnel.vcxproj -> E:\WeChat Files\chenyuan940613\Files\V1.3-二合一\V1.3-二合一\被控端\Release\ghostTunnel.exe
+  ghostTunnel.vcxproj -> E:\WeChat Files\chenyuan940613\Files\V1.3-二合一\V1.3-二合一\被控端\Release\ghostTunnel.pdb (Full PDB)
